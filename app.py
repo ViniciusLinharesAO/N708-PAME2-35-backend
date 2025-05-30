@@ -218,6 +218,188 @@ def create_ticket():
         conn.close()
         return jsonify({"error": str(e)}), 500
 
+# Rota para atualizar o status de um ticket
+@app.route('/tickets/<int:ticket_id>/status', methods=['PATCH'])
+def update_ticket_status(ticket_id):
+    # Verificar autenticação
+    user, error = auth_required()
+    if error:
+        return jsonify({"error": error}), 401
+
+    # Verificar permissão para atualizar o status
+    if user['role'] not in ['admin', 'organization']:
+        return jsonify({"error": "Não autorizado"}), 403
+
+    data = request.get_json()
+
+    if 'status' not in data or data['status'] not in ['aberto', 'em andamento', 'resolvido']:
+        return jsonify({"error": "Status inválido"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Verificar se o ticket existe
+        ticket = cursor.execute('SELECT * FROM tickets WHERE id = ?', (ticket_id,)).fetchone()
+
+        if not ticket:
+            conn.close()
+            return jsonify({"error": "Ticket não encontrado"}), 404
+
+        # Atualizar o status do ticket
+        cursor.execute(
+            'UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            (data['status'], ticket_id)
+        )
+        conn.commit()
+
+        conn.close()
+        return jsonify({
+            "message": "Status atualizado com sucesso",
+            "ticket_id": ticket_id,
+            "new_status": data['status']
+        }), 200
+
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+
+# Rota para atualizar um ticket existente
+@app.route('/tickets/<int:ticket_id>', methods=['PUT'])
+def update_ticket(ticket_id):
+    # Verificar autenticação
+    user, error = auth_required()
+    if error:
+        return jsonify({"error": error}), 401
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Verificar se o ticket existe
+        ticket = cursor.execute('SELECT * FROM tickets WHERE id = ?', (ticket_id,)).fetchone()
+
+        if not ticket:
+            conn.close()
+            return jsonify({"error": "Ticket não encontrado"}), 404
+
+        # Verificar permissão para editar o ticket
+        if user['role'] == 'user' and ticket['user_id'] != user['id']:
+            conn.close()
+            return jsonify({"error": "Não autorizado"}), 403
+
+        # Verificar se é multipart form data ou json
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            # Formulário com possível upload de imagem
+            if 'title' not in request.form or 'description' not in request.form or 'address' not in request.form:
+                conn.close()
+                return jsonify({"error": "Título, descrição e endereço são obrigatórios"}), 400
+
+            title = request.form['title']
+            description = request.form['description']
+            address = request.form['address']
+
+            # Processar a imagem (se existir)
+            image_url = ticket['image_url']  # Manter a URL atual por padrão
+            if 'image' in request.files:
+                image = request.files['image']
+                if image and allowed_file(image.filename):
+                    # Gerar nome único para o arquivo
+                    filename = secure_filename(str(uuid.uuid4()) + os.path.splitext(image.filename)[1])
+                    image_path = os.path.join(UPLOAD_FOLDER, filename)
+                    image.save(image_path)
+
+                    # Se havia uma imagem anterior, pode excluí-la para economizar espaço
+                    if ticket['image_url']:
+                        try:
+                            old_image_path = os.path.join(UPLOAD_FOLDER, os.path.basename(ticket['image_url']))
+                            if os.path.exists(old_image_path):
+                                os.remove(old_image_path)
+                        except:
+                            pass
+
+                    image_url = f'/uploads/{filename}'
+        else:
+            # Requisição JSON
+            data = request.get_json()
+
+            if 'title' not in data or 'description' not in data or 'address' not in data:
+                conn.close()
+                return jsonify({"error": "Título, descrição e endereço são obrigatórios"}), 400
+
+            title = data['title']
+            description = data['description']
+            address = data['address']
+            image_url = data.get('image_url', ticket['image_url'])
+
+        # Atualizar o ticket no banco de dados
+        cursor.execute(
+            '''
+            UPDATE tickets
+            SET title = ?, description = ?, image_url = ?, address = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            ''',
+            (title, description, image_url, address, ticket_id)
+        )
+        conn.commit()
+
+        conn.close()
+        return jsonify({
+            "message": "Ticket atualizado com sucesso",
+            "id": ticket_id
+        }), 200
+
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+
+# Rota para excluir um ticket
+@app.route('/tickets/<int:ticket_id>', methods=['DELETE'])
+def delete_ticket(ticket_id):
+    # Verificar autenticação
+    user, error = auth_required()
+    if error:
+        return jsonify({"error": error}), 401
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Verificar se o ticket existe
+        ticket = cursor.execute('SELECT * FROM tickets WHERE id = ?', (ticket_id,)).fetchone()
+
+        if not ticket:
+            conn.close()
+            return jsonify({"error": "Ticket não encontrado"}), 404
+
+        # Verificar permissão para excluir o ticket
+        if user['role'] == 'user' and ticket['user_id'] != user['id']:
+            conn.close()
+            return jsonify({"error": "Não autorizado"}), 403
+
+        # Excluir o ticket
+        cursor.execute('DELETE FROM tickets WHERE id = ?', (ticket_id,))
+        conn.commit()
+
+        # Se havia uma imagem, excluí-la
+        if ticket['image_url']:
+            try:
+                image_path = os.path.join(UPLOAD_FOLDER, os.path.basename(ticket['image_url']))
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+            except:
+                pass
+
+        conn.close()
+        return jsonify({
+            "message": "Ticket excluído com sucesso",
+            "id": ticket_id
+        }), 200
+
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+
 # Rota para obter estatísticas dos tickets
 @app.route('/tickets/stats', methods=['GET'])
 def get_ticket_stats():
