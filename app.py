@@ -96,6 +96,11 @@ def health_check():
         'service': 'tickets_service'
     })
 
+# Rota para servir imagens de uploads
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    return send_from_directory(UPLOAD_FOLDER, filename)
+
 # Rota para obter todos os tickets (com filtros opcionais)
 @app.route('/tickets', methods=['GET'])
 def get_tickets():
