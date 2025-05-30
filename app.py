@@ -218,6 +218,59 @@ def create_ticket():
         conn.close()
         return jsonify({"error": str(e)}), 500
 
+# Rota para obter um ticket específico
+@app.route('/tickets/<int:ticket_id>', methods=['GET'])
+def get_ticket(ticket_id):
+    # Verificar autenticação
+    user, error = auth_required()
+    if error:
+        return jsonify({"error": error}), 401
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Buscar o ticket
+        ticket = cursor.execute('SELECT * FROM tickets WHERE id = ?', (ticket_id,)).fetchone()
+
+        if not ticket:
+            conn.close()
+            return jsonify({"error": "Ticket não encontrado"}), 404
+
+        # Verificar permissão para visualizar o ticket
+        if user['role'] == 'user' and ticket['user_id'] != user['id']:
+            conn.close()
+            return jsonify({"error": "Não autorizado"}), 403
+
+        # Adicionar informações do usuário que criou o ticket
+        try:
+            # Buscar usuário do serviço de autenticação (implementação simulada)
+            # Em um cenário real, você faria uma chamada ao serviço de autenticação
+            user_info = {
+                "id": ticket['user_id'],
+                "name": "Nome do Usuário",  # Placeholder
+                "email": "email@example.com"  # Placeholder
+            }
+        except:
+            user_info = {
+                "id": ticket['user_id'],
+                "name": "Usuário desconhecido",
+                "email": ""
+            }
+
+        # Converter o objeto Row para dicionário
+        ticket_dict = dict(ticket)
+
+        # Adicionar informações do usuário
+        ticket_dict['user'] = user_info
+
+        conn.close()
+        return jsonify({"ticket": ticket_dict}), 200
+
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+
 # Rota para atualizar o status de um ticket
 @app.route('/tickets/<int:ticket_id>/status', methods=['PATCH'])
 def update_ticket_status(ticket_id):
