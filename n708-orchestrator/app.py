@@ -213,3 +213,20 @@ def update_ticket_status(ticket_id):
         return jsonify(response.json()), response.status_code
     except requests.RequestException as e:
         return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
+
+# Rota para servir imagens de uploads
+@app.route('/uploads/<path:filename>')
+def uploaded_file(filename):
+    # Apenas redireciona para o serviço de tickets
+    return redirect(f"{TICKETS_SERVICE_URL}/uploads/{filename}")
+
+# Tratamento de erros
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint não encontrado'}), 404
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({'error': 'Erro interno do servidor'}), 500
+
+if __name__ == '__main__':
