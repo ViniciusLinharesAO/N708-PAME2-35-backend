@@ -45,3 +45,171 @@ def health_check():
         'status': 'online',
         'services': services_status
     })
+    
+# Middleware para extrair o token JWT
+def get_token_from_header():
+    auth_header = request.headers.get('Authorization')
+    if auth_header and auth_header.startswith('Bearer '):
+        return auth_header.split(' ')[1]
+    return None
+
+# Rotas para o serviço de autenticação
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    
+    # Encaminha a requisição para o serviço de autenticação
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/register",
+            json=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Serviço de autenticação indisponível: {str(e)}'}), 503
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    
+    # Encaminha a requisição para o serviço de autenticação
+    try:
+        response = requests.post(
+            f"{AUTH_SERVICE_URL}/login",
+            json=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Serviço de autenticação indisponível: {str(e)}'}), 503
+
+@app.route('/api/auth/profile', methods=['GET'])
+def profile():
+    token = get_token_from_header()
+    if not token:
+        return jsonify({'error': 'Token não fornecido'}), 401
+    
+    # Encaminha a requisição para o serviço de autenticação
+    try:
+        response = requests.get(
+            f"{AUTH_SERVICE_URL}/profile",
+            headers={
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Serviço de autenticação indisponível: {str(e)}'}), 503
+
+# Rotas para o serviço de tickets
+@app.route('/api/tickets', methods=['GET'])
+def get_tickets():
+    token = get_token_from_header()
+    if not token:
+        return jsonify({'error': 'Token não fornecido'}), 401
+    
+    # Extrai parâmetros de query da URL
+    params = request.args.to_dict()
+    
+    # Encaminha a requisição para o serviço de tickets
+    try:
+        response = requests.get(
+            f"{TICKETS_SERVICE_URL}/tickets",
+            params=params,
+            headers={
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
+
+@app.route('/api/tickets', methods=['POST'])
+def create_ticket():
+    token = get_token_from_header()
+    if not token:
+        return jsonify({'error': 'Token não fornecido'}), 401
+    
+    # Verificar se é multipart form data (contém imagem) ou json
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        # Tratar upload de imagem e outros dados
+        data = request.form.to_dict()
+        files = {}
+        
+        if 'image' in request.files:
+            image = request.files['image']
+            files = {'image': (image.filename, image.read(), image.content_type)}
+            
+        # Encaminha a requisição para o serviço de tickets
+        try:
+            response = requests.post(
+                f"{TICKETS_SERVICE_URL}/tickets",
+                data=data,
+                files=files,
+                headers={
+                    'Authorization': f'Bearer {token}'
+                }
+            )
+            return jsonify(response.json()), response.status_code
+        except requests.RequestException as e:
+            return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
+    else:
+        # Requisição JSON padrão
+        data = request.get_json()
+        
+        try:
+            response = requests.post(
+                f"{TICKETS_SERVICE_URL}/tickets",
+                json=data,
+                headers={
+                    'Authorization': f'Bearer {token}',
+                    'Content-Type': 'application/json'
+                }
+            )
+            return jsonify(response.json()), response.status_code
+        except requests.RequestException as e:
+            return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
+
+@app.route('/api/tickets/<int:ticket_id>', methods=['GET'])
+def get_ticket(ticket_id):
+    token = get_token_from_header()
+    if not token:
+        return jsonify({'error': 'Token não fornecido'}), 401
+    
+    # Encaminha a requisição para o serviço de tickets
+    try:
+        response = requests.get(
+            f"{TICKETS_SERVICE_URL}/tickets/{ticket_id}",
+            headers={
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
+
+@app.route('/api/tickets/<int:ticket_id>/status', methods=['PATCH'])
+def update_ticket_status(ticket_id):
+    token = get_token_from_header()
+    if not token:
+        return jsonify({'error': 'Token não fornecido'}), 401
+    
+    data = request.get_json()
+    
+    # Encaminha a requisição para o serviço de tickets
+    try:
+        response = requests.patch(
+            f"{TICKETS_SERVICE_URL}/tickets/{ticket_id}/status",
+            json=data,
+            headers={
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
