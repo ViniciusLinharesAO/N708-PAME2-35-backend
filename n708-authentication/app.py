@@ -52,7 +52,7 @@ def init_db():
     if not admin:
         # Criar usuário admin padrão
         cursor.execute(
-            'INSERT INTO users (name, e-mail, password, document_type, document, role) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO users (name, email, password, document_type, document, role) VALUES (?, ?, ?, ?, ?, ?)',
             ('Admin', 'admin@example.com', generate_password_hash('admin123'), 'cpf', '00000000000', 'admin')
         )
     
@@ -61,7 +61,7 @@ def init_db():
     if not org:
         # Criar usuário organization padrão
         cursor.execute(
-            'INSERT INTO users (name, e-mail, password, document_type, document, role) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO users (name, email, password, document_type, document, role) VALUES (?, ?, ?, ?, ?, ?)',
             ('Prefeitura', 'prefeitura@example.com', generate_password_hash('org123'), 'cnpj', '00000000000000', 'organization')
         )
     
