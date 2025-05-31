@@ -156,3 +156,81 @@ def register():
     except sqlite3.Error as e:
         conn.close()
         return jsonify({"error": str(e)}), 500
+
+# Rota de login
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    
+    # Validação dos dados
+    if 'email' not in data or 'password' not in data:
+        return jsonify({"error": "E-mail e senha são obrigatórios"}), 400
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Buscar o usuário pelo e-mail
+        user = cursor.execute('SELECT * FROM users WHERE email = ?', (data['email'],)).fetchone()
+        
+        if not user or not check_password_hash(user['password'], data['password']):
+            conn.close()
+            return jsonify({"error": "Credenciais inválidas"}), 401
+        
+        # Criar o token JWT - CORREÇÃO AQUI
+        # O 'identity' deve ser uma string, não um dicionário
+        access_token = create_access_token(identity=str(user['id']))
+        
+        conn.close()
+        return jsonify({
+            "message": "Login realizado com sucesso",
+            "token": access_token,
+            "user": {
+                "id": user['id'],
+                "name": user['name'],
+                "email": user['email'],
+                "document": user['document'],
+                "document_type": user['document_type'],
+                "role": user['role']
+            }
+        }), 200
+    
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+
+# Rota para obter perfil do usuário
+@app.route('/profile', methods=['GET'])
+@jwt_required()
+def profile():
+    current_user = get_jwt_identity()
+    
+    return jsonify({
+        "user": current_user
+    }), 200
+
+# Rota para listar todos os usuários (apenas para admin)
+@app.route('/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    current_user = get_jwt_identity()
+    
+    # Verificar se o usuário tem permissão de admin
+    if current_user.get('role') != 'admin':
+        return jsonify({"error": "Não autorizado"}), 403
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        users = cursor.execute('SELECT id, name, email, document_type, document, role FROM users').fetchall()
+        
+        # Converter os objetos Row para dicionários
+        users_list = [dict(user) for user in users]
+        
+        conn.close()
+        return jsonify({"users": users_list}), 200
+    
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
