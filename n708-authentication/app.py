@@ -70,3 +70,89 @@ def init_db():
     
 # Inicializar o banco de dados na inicialização da aplicação
 init_db()
+
+# Rota para verificação de saúde
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'online',
+        'service': 'auth_service'
+    })
+
+# Rota de registro de usuário
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    
+    # Validação dos dados básicos
+    required_fields = ['name', 'email', 'password', 'documentType', 'document']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"error": f"O campo {field} é obrigatório"}), 400
+    
+    # Validação de e-mail
+    email_regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    if not re.match(email_regex, data['email']):
+        return jsonify({"error": "E-mail inválido"}), 400
+    
+    # Validação de documento (CPF ou CNPJ)
+    document_type = data['documentType']
+    document = data['document']
+    # Remover caracteres não numéricos
+    document = re.sub(r'\D', '', document)
+    
+    if document_type == 'cpf' and len(document) != 11:
+        return jsonify({"error": "CPF inválido"}), 400
+    elif document_type == 'cnpj' and len(document) != 14:
+        return jsonify({"error": "CNPJ inválido"}), 400
+    
+    # Processar endereço (se fornecido)
+    address = data.get('address', {})
+    address_json = json.dumps(address) if address else '{}'
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # Verificar se o e-mail já existe
+        user = cursor.execute('SELECT * FROM users WHERE email = ?', (data['email'],)).fetchone()
+        if user:
+            conn.close()
+            return jsonify({"error": "E-mail já cadastrado"}), 409
+        
+        # Verificar se o documento já existe
+        user = cursor.execute('SELECT * FROM users WHERE document = ?', (document,)).fetchone()
+        if user:
+            conn.close()
+            return jsonify({"error": f"{'CPF' if document_type == 'cpf' else 'CNPJ'} já cadastrado"}), 409
+        
+        # Criar o novo usuário
+        hashed_password = generate_password_hash(data['password'])
+        
+        cursor.execute(
+            '''
+            INSERT INTO users 
+            (name, email, password, document_type, document, address, role) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''',
+            (
+                data['name'], 
+                data['email'], 
+                hashed_password, 
+                document_type,
+                document,
+                address_json,
+                data.get('role', 'user')  # Por padrão, o papel é 'user'
+            )
+        )
+        conn.commit()
+        
+        # Obter o ID do usuário recém-criado
+        user_id = cursor.lastrowid
+        
+        conn.close()
+        return jsonify({"message": "Usuário cadastrado com sucesso", "id": user_id}), 201
+    
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
