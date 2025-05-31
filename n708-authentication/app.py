@@ -234,3 +234,42 @@ def get_users():
     except sqlite3.Error as e:
         conn.close()
         return jsonify({"error": str(e)}), 500
+
+# Rota para verificar token (usada por outros serviços)
+@app.route('/verify-token', methods=['POST'])
+def verify_token():
+    data = request.get_json()
+    
+    if 'token' not in data:
+        return jsonify({"error": "Token não fornecido"}), 400
+    
+    try:
+        from flask_jwt_extended.utils import decode_token
+        decoded = decode_token(data['token'])
+        
+        # O 'sub' agora contém apenas o user_id como string
+        user_id = decoded['sub']
+        
+        return jsonify({
+            "valid": True,
+            "user": user_id
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "valid": False,
+            "error": str(e)
+        }), 401
+
+# Tratamento de erros
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint não encontrado'}), 404
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({'error': 'Erro interno do servidor'}), 500
+
+if __name__ == '__main__':
+    # Obter porta do ambiente ou usar 5001 por padrão
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port)
