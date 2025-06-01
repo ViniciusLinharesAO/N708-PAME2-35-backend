@@ -1,0 +1,59 @@
+services:
+  authenticator:
+    build:
+      context: ./n708-authentication
+      dockerfile: Dockerfile
+      tags:
+        - authenticator:0.0.1
+    container_name: authenticator_service
+    networks:
+      - auth_network
+    ports:
+      - "5001:5001"
+    environment:
+      - JWT_SECRET_KEY=supersecretkey123
+      - DB_PATH=/data/users.db
+      - PORT=5001
+    volumes:
+      - authenticator_data:/data
+
+  orchestrator:
+    build:
+      context: ./n708-orchestrator
+      dockerfile: Dockerfile
+      tags:
+        - orchestrator:0.0.1
+    container_name: orchestrator_service
+    networks:
+      - auth_network
+    ports:
+      - "5002:5000"
+    environment:
+      - SOME_ENV_VAR=value_here
+    volumes:
+      - orchestrator_data:/app/data
+
+  ticket:
+    build:
+      context: ./n708-ticket
+      dockerfile: Dockerfile
+      tags:
+        - ticket:0.0.1
+    container_name: ticket_service
+    networks:
+      - auth_network
+    ports:
+      - "5003:5000"
+    environment:
+      - SOME_ENV_VAR=value_here
+    volumes:
+      - ticket_data:/app/data
+
+networks:
+  auth_network:
+    driver: bridge
+
+volumes:
+  authenticator_data:
+  orchestrator_data:
+  ticket_data:
