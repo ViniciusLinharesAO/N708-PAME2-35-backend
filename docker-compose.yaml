@@ -5,13 +5,13 @@ services:
       dockerfile: Dockerfile
       tags:
         - authenticator:0.0.1
-    container_name: authenticator_service
+    container_name: authenticator
     networks:
-      - auth_network
+      - mnt_com_network
     ports:
       - "5001:5001"
     environment:
-      - JWT_SECRET_KEY=supersecretkey123
+      - JWT_SECRET_KEY=#n708
       - DB_PATH=/data/users.db
       - PORT=5001
     volumes:
@@ -23,13 +23,16 @@ services:
       dockerfile: Dockerfile
       tags:
         - orchestrator:0.0.1
-    container_name: orchestrator_service
+    container_name: orchestrator
     networks:
-      - auth_network
+      - mnt_com_network
     ports:
-      - "5002:5000"
+      - "5000:5000"
     environment:
-      - SOME_ENV_VAR=value_here
+      - AUTH_SERVICE_URL=http://authenticator:5001
+      - TICKETS_SERVICE_URL=http://ticket:5002
+      - PORT=5000
+      - FLASK_ENV=development
     volumes:
       - orchestrator_data:/app/data
 
@@ -39,18 +42,22 @@ services:
       dockerfile: Dockerfile
       tags:
         - ticket:0.0.1
-    container_name: ticket_service
+    container_name: ticket
     networks:
-      - auth_network
+      - mnt_com_network
     ports:
-      - "5003:5000"
+      - "5002:5002"
     environment:
-      - SOME_ENV_VAR=value_here
+      - PORT=5002
+      - FLASK_ENV=development
+      - AUTH_SERVICE_URL=http://authenticator:5001
+      - DB_PATH=tickets.db
+      - UPLOAD_FOLDER=uploads
     volumes:
       - ticket_data:/app/data
 
 networks:
-  auth_network:
+  mnt_com_network:
     driver: bridge
 
 volumes:
