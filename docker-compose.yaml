@@ -1,0 +1,66 @@
+services:
+  authenticator:
+    build:
+      context: ./n708-authentication
+      dockerfile: Dockerfile
+      tags:
+        - authenticator:0.0.1
+    container_name: authenticator
+    networks:
+      - mnt_com_network
+    ports:
+      - "5001:5001"
+    environment:
+      - JWT_SECRET_KEY=#n708
+      - DB_PATH=/data/users.db
+      - PORT=5001
+    volumes:
+      - authenticator_data:/data
+
+  orchestrator:
+    build:
+      context: ./n708-orchestrator
+      dockerfile: Dockerfile
+      tags:
+        - orchestrator:0.0.1
+    container_name: orchestrator
+    networks:
+      - mnt_com_network
+    ports:
+      - "5000:5000"
+    environment:
+      - AUTH_SERVICE_URL=http://authenticator:5001
+      - TICKETS_SERVICE_URL=http://ticket:5002
+      - PORT=5000
+      - FLASK_ENV=development
+    volumes:
+      - orchestrator_data:/app/data
+
+  ticket:
+    build:
+      context: ./n708-ticket
+      dockerfile: Dockerfile
+      tags:
+        - ticket:0.0.1
+    container_name: ticket
+    networks:
+      - mnt_com_network
+    ports:
+      - "5002:5002"
+    environment:
+      - PORT=5002
+      - FLASK_ENV=development
+      - AUTH_SERVICE_URL=http://authenticator:5001
+      - DB_PATH=tickets.db
+      - UPLOAD_FOLDER=uploads
+    volumes:
+      - ticket_data:/app/data
+
+networks:
+  mnt_com_network:
+    driver: bridge
+
+volumes:
+  authenticator_data:
+  orchestrator_data:
+  ticket_data:

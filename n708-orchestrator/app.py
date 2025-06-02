@@ -1,5 +1,5 @@
 # app.py (Aplicação Orquestradora)
-from flask import Flask, request, jsonify
+from flask import Flask, redirect, request, jsonify
 from flask_cors import CORS
 import requests
 import os
@@ -19,33 +19,33 @@ def check_services():
         'auth_service': 'offline',
         'tickets_service': 'offline'
     }
-    
+
     try:
         auth_response = requests.get(f"{AUTH_SERVICE_URL}/health", timeout=2)
         if auth_response.status_code == 200:
             services_status['auth_service'] = 'online'
     except:
         pass
-    
+
     try:
         tickets_response = requests.get(f"{TICKETS_SERVICE_URL}/health", timeout=2)
         if tickets_response.status_code == 200:
             services_status['tickets_service'] = 'online'
     except:
         pass
-    
+
     return services_status
 
 # Rota para verificar a saúde da aplicação orquestradora
 @app.route('/health', methods=['GET'])
 def health_check():
     services_status = check_services()
-    
+
     return jsonify({
         'status': 'online',
         'services': services_status
     })
-    
+
 # Middleware para extrair o token JWT
 def get_token_from_header():
     auth_header = request.headers.get('Authorization')
@@ -57,7 +57,7 @@ def get_token_from_header():
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     data = request.get_json()
-    
+
     # Encaminha a requisição para o serviço de autenticação
     try:
         response = requests.post(
@@ -72,7 +72,7 @@ def register():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
-    
+
     # Encaminha a requisição para o serviço de autenticação
     try:
         response = requests.post(
@@ -89,7 +89,7 @@ def profile():
     token = get_token_from_header()
     if not token:
         return jsonify({'error': 'Token não fornecido'}), 401
-    
+
     # Encaminha a requisição para o serviço de autenticação
     try:
         response = requests.get(
@@ -109,10 +109,10 @@ def get_tickets():
     token = get_token_from_header()
     if not token:
         return jsonify({'error': 'Token não fornecido'}), 401
-    
+
     # Extrai parâmetros de query da URL
     params = request.args.to_dict()
-    
+
     # Encaminha a requisição para o serviço de tickets
     try:
         response = requests.get(
@@ -132,17 +132,17 @@ def create_ticket():
     token = get_token_from_header()
     if not token:
         return jsonify({'error': 'Token não fornecido'}), 401
-    
+
     # Verificar se é multipart form data (contém imagem) ou json
     if request.content_type and 'multipart/form-data' in request.content_type:
         # Tratar upload de imagem e outros dados
         data = request.form.to_dict()
         files = {}
-        
+
         if 'image' in request.files:
             image = request.files['image']
             files = {'image': (image.filename, image.read(), image.content_type)}
-            
+
         # Encaminha a requisição para o serviço de tickets
         try:
             response = requests.post(
@@ -159,7 +159,7 @@ def create_ticket():
     else:
         # Requisição JSON padrão
         data = request.get_json()
-        
+
         try:
             response = requests.post(
                 f"{TICKETS_SERVICE_URL}/tickets",
@@ -178,7 +178,7 @@ def get_ticket(ticket_id):
     token = get_token_from_header()
     if not token:
         return jsonify({'error': 'Token não fornecido'}), 401
-    
+
     # Encaminha a requisição para o serviço de tickets
     try:
         response = requests.get(
@@ -197,9 +197,9 @@ def update_ticket_status(ticket_id):
     token = get_token_from_header()
     if not token:
         return jsonify({'error': 'Token não fornecido'}), 401
-    
+
     data = request.get_json()
-    
+
     # Encaminha a requisição para o serviço de tickets
     try:
         response = requests.patch(
@@ -230,3 +230,6 @@ def internal_server_error(error):
     return jsonify({'error': 'Erro interno do servidor'}), 500
 
 if __name__ == '__main__':
+    # Obter porta do ambiente ou usar 5000 por padrão
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
