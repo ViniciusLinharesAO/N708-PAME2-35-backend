@@ -103,9 +103,21 @@ def get_user_from_auth_db(user_id):
     Em produção, isso seria feito via API do serviço de auth.
     """
     try:
-        # Conectar ao banco do serviço de auth
-        auth_db_path = '../n708-authentication/users.db'  # Ajustar caminho conforme necessário
-        if os.path.exists(auth_db_path):
+        # Lista de possíveis caminhos para o banco do serviço de auth
+        possible_paths = [
+            '../n708-authentication/users.db',
+            './users.db',
+            'users.db',
+            os.path.join(os.path.dirname(__file__), '../n708-authentication/users.db')
+        ]
+        
+        auth_db_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                auth_db_path = path
+                break
+        
+        if auth_db_path:
             conn = sqlite3.connect(auth_db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -126,6 +138,7 @@ def get_user_from_auth_db(user_id):
                 }
         
         # Fallback se não conseguir acessar o banco
+        print(f"WARNING: Não foi possível acessar o banco de auth. User ID: {user_id}")
         return {
             'id': user_id,
             'role': 'user',  # Assume user por segurança
@@ -133,7 +146,7 @@ def get_user_from_auth_db(user_id):
             'email': ''
         }
     except Exception as e:
-        print(f"Erro ao buscar usuário: {e}")
+        print(f"ERROR ao buscar usuário: {e}")
         return {
             'id': user_id,
             'role': 'user',
@@ -382,6 +395,59 @@ def update_ticket_status(ticket_id):
 
     except sqlite3.Error as e:
         conn.close()
+        return jsonify({"error": str(e)}), 500
+
+# Rota para assumir um ticket (para organizações)
+@app.route('/tickets/<int:ticket_id>/assign', methods=['PATCH'])
+def assign_ticket(ticket_id):
+    # Verificar autenticação
+    user, error = auth_required()
+    if error:
+        return jsonify({"error": error}), 401
+
+    # Debug: verificar dados do usuário
+    print(f"DEBUG - User data: {user}")
+    print(f"DEBUG - User role: {user.get('role', 'NO_ROLE')}")
+
+    # Verificar permissão para assumir o ticket (apenas organizações)
+    if user.get('role') not in ['organization', 'empresa']:
+        return jsonify({"error": f"Apenas organizações podem assumir tickets. Role atual: {user.get('role', 'undefined')}"}), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Verificar se o ticket existe
+        ticket = cursor.execute('SELECT * FROM tickets WHERE id = ?', (ticket_id,)).fetchone()
+
+        if not ticket:
+            conn.close()
+            return jsonify({"error": "Ticket não encontrado"}), 404
+
+        # Verificar se o ticket ainda está aberto
+        if ticket['status'] != 'aberto':
+            conn.close()
+            return jsonify({"error": "Ticket já foi assumido ou resolvido"}), 400
+
+        # Atualizar o status do ticket para 'em andamento'
+        cursor.execute(
+            'UPDATE tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            ('em andamento', ticket_id)
+        )
+        conn.commit()
+
+        conn.close()
+        return jsonify({
+            "message": "Ticket assumido com sucesso",
+            "ticket_id": ticket_id,
+            "status": "em andamento",
+            "assigned_to": user.get('name', 'Organização')
+        }), 200
+
+    except Exception as e:
+        if 'conn' in locals():
+            conn.close()
+        print(f"DEBUG - Error in assign_ticket: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # Rota para atualizar um ticket existente
