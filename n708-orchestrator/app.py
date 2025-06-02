@@ -213,6 +213,31 @@ def update_ticket_status(ticket_id):
         return jsonify(response.json()), response.status_code
     except requests.RequestException as e:
         return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
+    
+
+@app.route('/api/tickets/<int:ticket_id>/assign', methods=['PATCH'])
+def assign_ticket(ticket_id):
+    token = get_token_from_header()
+    if not token:
+        return jsonify({'error': 'Token não fornecido'}), 401
+
+    data = request.get_json()
+    if not data:
+        data = {}
+
+    # Encaminha a requisição para o serviço de tickets
+    try:
+        response = requests.patch(
+            f"{TICKETS_SERVICE_URL}/tickets/{ticket_id}/assign",
+            json=data,
+            headers={
+                'Authorization': f'Bearer {token}',
+                'Content-Type': 'application/json'
+            }
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Serviço de tickets indisponível: {str(e)}'}), 503
 
 # Rota para servir imagens de uploads
 @app.route('/uploads/<path:filename>')
