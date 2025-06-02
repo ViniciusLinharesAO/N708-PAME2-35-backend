@@ -62,6 +62,7 @@ def allowed_file(filename):
 # Função para verificar token JWT com o serviço de autenticação
 def verify_token(token):
     try:
+        # Primeiro, verificar se o token é válido
         response = requests.post(
             f"{AUTH_SERVICE_URL}/verify-token",
             json={"token": token},
@@ -69,15 +70,76 @@ def verify_token(token):
         )
         if response.status_code == 200:
             user_id = response.json()['user']
-            # Retornar dados básicos do usuário baseado no ID
-            return {
-                'id': int(user_id),
-                'role': 'user'  # Por simplicidade, assumir role 'user'
-            }, None
+            
+            # Agora, buscar os dados completos do usuário no serviço de auth
+            # Fazer uma chamada para obter o perfil completo
+            profile_response = requests.get(
+                f"{AUTH_SERVICE_URL}/profile",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=5
+            )
+            
+            if profile_response.status_code == 200:
+                # Se conseguir pegar o perfil, usar os dados completos
+                user_data = profile_response.json().get('user', {})
+                return {
+                    'id': int(user_id),
+                    'role': user_data.get('role', 'user'),
+                    'name': user_data.get('name', ''),
+                    'email': user_data.get('email', '')
+                }, None
+            else:
+                # Fallback: buscar dados básicos do banco local de auth
+                return get_user_from_auth_db(int(user_id)), None
         else:
             return None, response.json().get('error', 'Token inválido')
     except requests.RequestException as e:
         return None, f"Erro ao verificar token: {str(e)}"
+
+# NOVA FUNÇÃO: Buscar dados do usuário diretamente no banco do serviço de auth
+def get_user_from_auth_db(user_id):
+    """
+    Função alternativa para buscar dados do usuário.
+    Em produção, isso seria feito via API do serviço de auth.
+    """
+    try:
+        # Conectar ao banco do serviço de auth
+        auth_db_path = '../n708-authentication/users.db'  # Ajustar caminho conforme necessário
+        if os.path.exists(auth_db_path):
+            conn = sqlite3.connect(auth_db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            user = cursor.execute(
+                'SELECT id, name, email, role FROM users WHERE id = ?', 
+                (user_id,)
+            ).fetchone()
+            
+            conn.close()
+            
+            if user:
+                return {
+                    'id': user['id'],
+                    'role': user['role'],
+                    'name': user['name'],
+                    'email': user['email']
+                }
+        
+        # Fallback se não conseguir acessar o banco
+        return {
+            'id': user_id,
+            'role': 'user',  # Assume user por segurança
+            'name': 'Usuário',
+            'email': ''
+        }
+    except Exception as e:
+        print(f"Erro ao buscar usuário: {e}")
+        return {
+            'id': user_id,
+            'role': 'user',
+            'name': 'Usuário',
+            'email': ''
+        }
 
 # Middleware para extrair e verificar token
 def auth_required():
