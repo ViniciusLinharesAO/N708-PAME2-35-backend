@@ -5,7 +5,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 RUN mkdir -p uploads
 EXPOSE 5002
-ENV FLASK_APP=n708-ticket/app.py
+ENV FLASK_APP=app
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_ENV=production
 CMD ["flask", "run"]
