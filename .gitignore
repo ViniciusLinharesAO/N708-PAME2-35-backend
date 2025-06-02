@@ -53,3 +53,6 @@ pylint-global.rc
 
 # sqlite
 *.db
+
+# upload
+n708-ticket/uploads
