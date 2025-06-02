@@ -203,11 +203,38 @@ def login():
 @app.route('/profile', methods=['GET'])
 @jwt_required()
 def profile():
-    current_user = get_jwt_identity()
+    # Obter o ID do usuário do token
+    current_user_id = get_jwt_identity()
     
-    return jsonify({
-        "user": current_user
-    }), 200
+    # Buscar dados completos do usuário no banco
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        user = cursor.execute(
+            'SELECT id, name, email, document_type, document, role FROM users WHERE id = ?', 
+            (int(current_user_id),)
+        ).fetchone()
+        
+        if not user:
+            conn.close()
+            return jsonify({"error": "Usuário não encontrado"}), 404
+        
+        conn.close()
+        return jsonify({
+            "user": {
+                "id": user['id'],
+                "name": user['name'],
+                "email": user['email'],
+                "document": user['document'],
+                "document_type": user['document_type'],
+                "role": user['role']
+            }
+        }), 200
+    
+    except sqlite3.Error as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
 
 # Rota para listar todos os usuários (apenas para admin)
 @app.route('/users', methods=['GET'])
