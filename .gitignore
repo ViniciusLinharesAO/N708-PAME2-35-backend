@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.manifest
+*.spec
+
+# Environments
+env/
+venv/
+ENV/
+ENV.bak/
+.venv/
+.Python
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# IDEs/Editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Logs
+*.log
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# Test coverage
+.coverage
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Linting
+.pyre/
+.pytype/
+pylint-report.txt
+pylint-global.rc
+
+# sqlite
+*.db
