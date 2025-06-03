@@ -16,7 +16,7 @@ Projeto da disciplina de "Projeto Aplicado de Multiplataformas etapa 2"
 
 # 📦 Tecnologias
 
-- Python 3.12
+- Python 3.11
 - Flask
 - SQLite
 - JWT (access & refresh tokens)
@@ -29,6 +29,7 @@ Projeto da disciplina de "Projeto Aplicado de Multiplataformas etapa 2"
 ---
 
 ## 1.1. Dependências
+
 - Docker
 - Docker Compose
 
@@ -44,7 +45,13 @@ docker compose up -d
 
 ---
 
-## 2.1. Criar ambiente virtual ativar e instalar as dependências
+## 2.1. Dependências
+
+- python
+
+---
+
+## 2.2. Criar ambiente virtual ativar e instalar as dependências
 é necessário criar ambiente virtual individual de cada app
 
 ```bash
